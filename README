@@ -1,17 +1,17 @@
-This will be a repository for senior UW bioengineering students to post their projects. 
+This will be a repository for senior UW bioengineering students to post their projects. Ideally, this will lead to students sharing their work for future students to implement or improve upon while completing their own work.
 
-Ideally, this will lead to students sharing their work for future students to implement or improve upon while completing their own work.
+In order to contribute, create a new fodler for your project and put your files in that branch. By convention, the folder should have your name and graduation year in it; so for my project, the folder name is "Ross Jones ('14)"
 
-In order to contribute, create a new branch for your project and put your files in that branch. 
-
-You may organize your branch however you like, though please try to have self-descriptive file names or a README file which explains the purpose of each file.
+You may organize your folder however you like, though please attempt to make it somewhat navigatable; ie do not just paste every file you have ever used into the directory and call it good. 
 
 Thank you for your contribution to future learning!
 
 
---------------------------------------------------------------------------------------------------------------
-
-Updated 2.7.14
-
-Ross Jones   ('14)
-Greg Medlock ('14)
+#######################
+#                     #
+#   Updated 2.7.14    #
+#                     #
+# Ross Jones   ('14)  #
+# Greg Medlock ('14)  #
+#                     #
+#######################
