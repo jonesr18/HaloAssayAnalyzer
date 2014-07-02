@@ -1,0 +1,21 @@
+These images can be used for testing purposes. 
+
+The Ma Lab supplied the following images:
+
+11.6--X-ray 15 min-1.tiff
+11.6--X ray 15 min-2.tiff
+11.6--X-ray 15 min-3.tiff
+Array Image-1.tiff
+figure pic.png
+metal ion for HeLa.png
+nanoparticle for HeLa.png
+X-ray for A172.tiff
+
+The Singh Lab supplied the following images:
+
+100 uM H2O2 Image 1.tiff
+100 uM H2O2 Image 2.tiff
+100 uM H2O2 Image 3.tiff
+100 uM H2O2 Image 4.tiff
+100 uM H2O2 Image 5.tiff
+100 uM H2O2 Image 6.tiff
