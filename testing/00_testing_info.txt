@@ -1,3 +1,3 @@
 This folder contains a variety of files used for testing purposes.
 
-One file of particular note is an older DNA damage analysis file, DNA_damage.m, which is placed in this folder because it is useful for testing and works with the current class file structure.
+One file of particular note is an older DNA damage analysis file, DNA_damage.m, which is placed in this folder because it is useful for testing and works with the current files.
