@@ -1,8 +1,10 @@
 ##About
 
-This repository contains testing files and source code for my HaloAssayAnalyzer program.
+This repository contains testing files and source code for my HaloAssayAnalyzer program. The repository is located at the web address https://github.com/jonesr18/HaloAssayAnalyzer.
 
 The program is a simple GUI which lets users select options for computing DNA damage metrics and classifying cells as apoptotic, necrotic, or healthy as determined by the halo assay. 
+
+To use the files herein, you will need to copy them into a local directory and open them in MATLAB. In order to properly function, all folders and subfolders should be placed on the MATLAB path.
 
 ##Relevant Publications
 
