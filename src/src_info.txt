@@ -1,0 +1,12 @@
+This folder contains the source files for the current version. 
+
+ApopCell.m				- Stores and manages data for cells being analyzed for apoptosis / cell classification by the Fast Halo Assay.
+Damage_analysis.m		- A handy script for plotting DNA damage metrics
+DmgCell.m				- Stores and manages data for cells being analyzed for DNA damage by the Fast Halo Assay. 
+Exports.m				- A functional class for saving data in standard CSV format from the FHA.
+HaloImage.m				- Manages and processes images of cells captured for assessment with the Fast Halo Assay. 
+HaloMain.m				- Main file for starting and running GUI.
+Imports.m				- A functional class for importing data and images from fast halo assays and comet assays.
+Initialization.m		- GUI activity manager.
+USSSheetfedCoated.icc	- .icc file for CMYK color format.
+cmyk2rgb.m				- Converts CMYK formatted images to RGB. 
