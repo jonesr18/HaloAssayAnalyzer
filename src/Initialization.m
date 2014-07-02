@@ -965,6 +965,7 @@ end
 % Prepare cell matrix for DNA damage Excel output
 %   DD is for "DNA Damage" hereout
 if ~isempty(damageCalcs) 
+    calcDamage = true;
     if strcmp(damageCalcs{1}, 'all')
         metricsUsed = metrics;
     else
@@ -974,6 +975,8 @@ if ~isempty(damageCalcs)
     combinedDD = cell(1, numel(handles.images));
     numCellsDD = 0; 
     allStatsDataDD = cell(0, numel(metricsUsed));
+else
+    calcDamage = false;
 end
 
 % Prepare for cell classification output
@@ -1064,7 +1067,7 @@ for i = 1:numel(handles.images)
     end
     
     % Make damage cell objects and analyze if requested
-    if ~isempty(damageCalcs)
+    if calcDamage
         im.makeCells('dmg', mode, scheme, filterEccen);
         if ~isempty(im.dCells)
             im.calcDamage(damageCalcs{:});
@@ -1147,7 +1150,7 @@ if classify
 end
 
 % Compute overall statistics for DNA damage
-if ~isempty(damageCalcs)
+if calcDamage
     
     % Prepare statistics labels
     allStatsLabelsDD = {
@@ -1192,8 +1195,12 @@ fullfileCC = strcat(handles.outdir, filename, ' classification', '.csv');
 
 % Write files to CSV in standard output
 out = Exports();
-out.writeCSV(fullfileDD, allDataDD);
-out.writeCSV(fullfileCC, allDataCC);
+if calcDamage
+    out.writeCSV(fullfileDD, allDataDD);
+end
+if classify
+    out.writeCSV(fullfileCC, allDataCC);
+end
 
 
 
