@@ -35,7 +35,7 @@ function varargout = Initialization(varargin)
 % You should have received a copy of the GNU General Public License along with this program. If
 % not see http://www.gnu.org/licenses/gpl.html
 % 
-% Updated 7.1.14
+% Updated 8.6.14
 
 % Last Modified by GUIDE v2.5 01-Jul-2014 11:15:38
 
@@ -63,24 +63,50 @@ end
 function Initialization_OpeningFcn(hObject, ~, handles, varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % varargin   command line arguments to Initialization (see VARARGIN)
 
 warning('off', 'images:initSize:adjustingMag');
 
-% Set handles fields
-handles.images = {};
-handles.currImage = [];
-handles.outdir = strcat(pwd, '\');
-handles.customName = false;
-set(handles.lowerSlider, 'value', 10); % needed to make it go to the bottom for some reason
-set(handles.lowerSlider, 'value', 0);
-set(handles.upperSlider, 'value', 255);
-set(handles.lowerThresh, 'string', num2str(0));
-set(handles.upperThresh, 'string', num2str(255));
-set(handles.outputPath, 'string', handles.outdir);
-set(handles.filterEccen, 'value', 1);   % By default, filter cells by eccentricity
+% Load configuration data
+if exist('config.mat', 'file')
+    load config.mat
+    
+    % Handles which require accessing their string
+    strings = {'lowerThresh', 'upperThresh', 'eccenMetric', 'outputPath', 'sampleName'};
+
+    % Handles which have direct data
+    direct = {'outdir', 'customName'};
+
+    % Set handles to saved values
+    for f = fieldnames(configData)'
+        switch f{:}
+            case strings    % Load string
+                set(handles.(f{:}), 'string', configData.(f{:}));
+            case direct     % Load data
+                handles.(f{:}) = configData.(f{:});
+            otherwise       % Load value
+                set(handles.(f{:}), 'value', configData.(f{:}));
+        end
+    end
+else
+    % Set handles fields
+    handles.images = {};
+    handles.currImage = [];
+    handles.customName = false;
+    handles.outdir = strcat(pwd, '\');
+    set(handles.outputPath, 'string', handles.outdir);
+    set(handles.lowerSlider, 'value', 10);      % Needed to make it go to the bottom for some reason
+    set(handles.lowerSlider, 'value', 0);       % Sliders are set to min and max at default
+    set(handles.upperSlider, 'value', 255);
+    set(handles.lowerThresh, 'string', '0');
+    set(handles.upperThresh, 'string', '255');
+    set(handles.outputPath, 'string', handles.outdir);
+    set(handles.filterEccen, 'value', 1);           % By default, filter cells by eccentricity
+    set(handles.eccenMetric, 'string', '0.500');    % Default eccen metric is 0.500
+    set(handles.sampleName, 'string', 'Name (Treatment, #)');
+end
 
 % Choose default command line output for Initialization
 handles.output = hObject;
@@ -95,7 +121,7 @@ guidata(hObject, handles);
 function varargout = Initialization_OutputFcn(~, ~, handles) 
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
@@ -118,7 +144,7 @@ varargout{1} = handles.output;
 % --- Executes on button press in about.
 function about_Callback(~, ~, ~) %#ok<*DEFNU>
 % hObject    handle to about (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 text = sprintf(['Copyright (C) 2014 Ross Jones, Singh Laboratory, University of Washington\n\n',...
                 'Contact: jonesr18@gmail.com\n\n',...
@@ -139,7 +165,7 @@ msgbox(text, 'About', 'help')
 % --- Executes on button press in licence.
 function licence_Callback(~, ~, ~)
 % hObject    handle to licence (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 open('GNU General Public Licence v3.0.txt')
 
@@ -151,7 +177,7 @@ open('GNU General Public Licence v3.0.txt')
 % --- Executes on button press in imageBrowse.
 function imageBrowse_Callback(hObject, ~, handles)
 % hObject    handle to imageBrowse (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 imArray = Imports.images();
 menuItems = cell(1, numel(imArray));
@@ -168,7 +194,7 @@ guidata(hObject, handles)
 % --- Executes on selection change in imageMenu.
 function imageMenu_Callback(hObject, ~, handles)
 % hObject    handle to imageMenu (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns imageMenu contents as cell array
@@ -180,7 +206,7 @@ guidata(hObject, handles)
 % --- Executes on button press in crop.
 function crop_Callback(hObject, ~, handles)
 % hObject    handle to crop (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 [~, rect] = imcrop(handles.images{handles.currImage}.image, []);
 if ~isempty(rect)
@@ -198,7 +224,7 @@ guidata(hObject, handles)
 % --- Executes on button press in invert.
 function invert_Callback(hObject, ~, handles)
 % hObject    handle to invert (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 for im = handles.images
     im{:}.invert();
@@ -209,7 +235,7 @@ guidata(hObject, handles)
 % --- Executes on slider movement.
 function lowerSlider_Callback(hObject, ~, handles)
 % hObject    handle to lowerSlider (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'Value') returns position of slider
@@ -223,7 +249,7 @@ guidata(hObject, handles)
 % --- Executes on slider movement.
 function upperSlider_Callback(hObject, ~, handles)
 % hObject    handle to upperSlider (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'Value') returns position of slider
@@ -236,7 +262,7 @@ guidata(hObject, handles)
 
 function lowerThresh_Callback(hObject, ~, handles)
 % hObject    handle to lowerThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'String') returns contents of lowerThresh as text
@@ -249,7 +275,7 @@ guidata(hObject, handles)
 
 function upperThresh_Callback(hObject, ~, handles)
 % hObject    handle to upperThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'String') returns contents of upperThresh as text
@@ -263,7 +289,7 @@ guidata(hObject, handles)
 % --- Executes on button press in manualThresh.
 function manualThresh_Callback(hObject, ~, handles)
 % hObject    handle to manualThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 % Hint: get(hObject,'Value') returns toggle state of manualThresh
 updateImage(handles)
@@ -292,7 +318,7 @@ end
 % --- Executes on button press in calcAll.
 function calcAll_Callback(hObject, ~, handles)
 % hObject    handle to calcAll (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcAll
@@ -313,7 +339,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcNDF.
 function calcNDF_Callback(hObject, ~, handles)
 % hObject    handle to calcNDF (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcNDF
@@ -329,7 +355,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcHD.
 function calcHD_Callback(hObject, ~, handles)
 % hObject    handle to calcHD (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcHD
@@ -345,7 +371,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcHM.
 function calcHM_Callback(hObject, ~, handles)
 % hObject    handle to calcHM (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcHM
@@ -361,7 +387,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcAHM.
 function calcAHM_Callback(hObject, ~, handles)
 % hObject    handle to calcAHM (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcAHM
@@ -377,7 +403,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcIHI.
 function calcIHI_Callback(hObject, ~, handles)
 % hObject    handle to calcIHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcIHI
@@ -393,7 +419,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcAHI.
 function calcAHI_Callback(hObject, ~, handles)
 % hObject    handle to calcAHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcAHI
@@ -409,7 +435,7 @@ guidata(hObject, handles)
 % --- Executes on button press in calcRHI.
 function calcRHI_Callback(hObject, ~, handles)
 % hObject    handle to calcRHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of calcRHI
@@ -431,7 +457,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotAllDmg.
 function plotAllDmg_Callback(hObject, ~, handles)
 % hObject    handle to plotAllDmg (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotAllDmg
@@ -465,7 +491,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotNDF.
 function plotNDF_Callback(hObject, ~, handles)
 % hObject    handle to plotNDF (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotNDF
@@ -482,7 +508,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotHD.
 function plotHD_Callback(hObject, ~, handles)
 % hObject    handle to plotHD (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotHD
@@ -499,7 +525,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotHM.
 function plotHM_Callback(hObject, ~, handles)
 % hObject    handle to plotHM (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotHM
@@ -516,7 +542,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotAHM.
 function plotAHM_Callback(hObject, ~, handles)
 % hObject    handle to plotAHM (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotAHM
@@ -533,7 +559,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotIHI.
 function plotIHI_Callback(hObject, ~, handles)
 % hObject    handle to plotIHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotIHI
@@ -550,7 +576,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotAHI.
 function plotAHI_Callback(hObject, ~, handles)
 % hObject    handle to plotAHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotAHI
@@ -567,7 +593,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotRHI.
 function plotRHI_Callback(hObject, ~, handles)
 % hObject    handle to plotRHI (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotRHI
@@ -590,7 +616,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotAllImage.
 function plotAllImage_Callback(hObject, ~, handles)
 % hObject    handle to plotAllImage (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotAllImage
@@ -609,7 +635,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotImage.
 function plotImage_Callback(hObject, ~, handles)
 % hObject    handle to plotImage (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotImage
@@ -623,7 +649,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotContour.
 function plotContour_Callback(hObject, ~, handles)
 % hObject    handle to plotContour (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotContour
@@ -637,7 +663,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotThresh.
 function plotThresh_Callback(hObject, ~, handles)
 % hObject    handle to plotThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotThresh
@@ -651,7 +677,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotBinary.
 function plotBinary_Callback(hObject, ~, handles)
 % hObject    handle to plotBinary (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotBinary
@@ -665,7 +691,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotEccen.
 function plotEccen_Callback(hObject, ~, handles)
 % hObject    handle to plotEccen (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotEccen
@@ -682,7 +708,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotGradmag.
 function plotGradmag_Callback(hObject, ~, handles)
 % hObject    handle to plotGradmag (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotGradmag
@@ -696,7 +722,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotCircles.
 function plotCircles_Callback(hObject, ~, handles)
 % hObject    handle to plotCircles (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotCircles
@@ -715,7 +741,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotLabels.
 function plotLabels_Callback(hObject, ~, handles)
 % hObject    handle to plotLabels (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotLabels
@@ -735,7 +761,7 @@ guidata(hObject, handles)
 % --- Executes on selection change in mode.
 function mode_Callback(hObject, ~, handles)
 % hObject    handle to mode (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns mode contents as cell array
@@ -751,7 +777,7 @@ guidata(hObject, handles)
 % --- Executes on selection change in scheme.
 function scheme_Callback(hObject, ~, handles)
 % hObject    handle to scheme (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns scheme contents as cell array
@@ -761,7 +787,7 @@ guidata(hObject, handles)
 % --- Executes on button press in filterEccen.
 function filterEccen_Callback(hObject, ~, handles)
 % hObject    handle to filterEccen (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of filterEccen
@@ -773,7 +799,7 @@ guidata(hObject, handles)
 
 function eccenMetric_Callback(hObject, ~, handles)
 % hObject    handle to eccenMetric (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'String') returns contents of eccenMetric as text
@@ -811,7 +837,7 @@ guidata(hObject, handles)
 % --- Executes on button press in plotClass.
 function plotClass_Callback(hObject, ~, handles)
 % hObject    handle to plotClass (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of plotClass
@@ -830,32 +856,35 @@ guidata(hObject, handles)
 
 function outputPath_Callback(hObject, ~, handles)
 % hObject    handle to outputPath (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'String') returns contents of outputPath as text
 %        str2double(get(hObject,'String')) returns contents of outputPath as a double
 outdir = get(hObject, 'string');
+handles = updateOutdir(outdir, handles);
+guidata(hObject, handles)
+
+% --- Executes on button press in outputBrowse.
+function outputBrowse_Callback(hObject, ~, handles)
+% hObject    handle to outputBrowse (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+outdir = uigetdir(pwd, 'Output File Directory');
+if ischar(outdir)
+    handles = updateOutdir(outdir, handles);
+end
+guidata(hObject, handles)
+
+% --- Sets the output directory to that specified, if it is valid
+function handles = updateOutdir(outdir, handles)
 if exist(outdir, 'dir')
     if outdir(end) ~= '\'
         outdir = strcat(outdir, '\');
     end
     handles.outdir = outdir;
 end
-set(hObject, 'string', handles.outdir);
-guidata(hObject, handles)
-
-% --- Executes on button press in outputBrowse.
-function outputBrowse_Callback(hObject, ~, handles)
-% hObject    handle to outputBrowse (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-outdir = uigetdir(pwd, 'Output File Directory');
-if ischar(outdir)
-    set(handles.outputPath, 'string', outdir);
-    outputPath_Callback(handles.outputPath, [], handles);
-end
-guidata(hObject, handles)
+set(handles.outputPath, 'string', outdir);
 
 
 
@@ -866,7 +895,7 @@ guidata(hObject, handles)
 
 function sampleName_Callback(hObject, ~, handles)
 % hObject    handle to sampleName (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hints: get(hObject,'String') returns contents of sampleName as text
@@ -883,11 +912,15 @@ guidata(hObject, handles)
 % --- Executes on button press in run.
 function run_Callback(~, ~, handles)
 % hObject    handle to run (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+tic
 metrics = {'NDF', 'HD', 'HM', 'AHM', 'IHI', 'AHI', 'RHI'};
 plotTypes = {'Image', 'Contour', 'Thresh', 'Binary', 'Eccen', 'Gradmag', 'Circles', 'Labels'};
+
+% --- Check GUI options --- %
+fprintf(1, 'Checking options selected\n');
 
 % Check DNA damage calculation options
 damageCalcs = {};
@@ -962,40 +995,38 @@ else
     filterEccen = false;
 end
 
-% Prepare cell matrix for DNA damage Excel output
-%   DD is for "DNA Damage" hereout
-if ~isempty(damageCalcs) 
-    calcDamage = true;
-    if strcmp(damageCalcs{1}, 'all')
-        metricsUsed = metrics;
-    else
-        metricsUsed = damageCalcs;
-    end
-    titlesDD = [{'Image #', 'Cell #'}, metricsUsed];
-    combinedDD = cell(1, numel(handles.images));
-    numCellsDD = 0; 
-    allStatsDataDD = cell(0, numel(metricsUsed));
-else
-    calcDamage = false;
+% --- Cycle through each iamge and perform actions as requested --- %
+
+% Process images
+numImages = numel(handles.images);
+fprintf(1, 'Processing %d images\n', numImages);
+for im = handles.images
+    im{:}.process();
 end
 
-% Prepare for cell classification output
-%   CC is for "Cell Classification" hereout
+% Make apoptosis cell objects and analyze if requested
 contents = cellstr(get(handles.classifier, 'string'));
 classifier = contents{get(handles.classifier, 'value')};
 if ~strcmp(classifier, 'Select Classifier')
     
-    % Check which classifier to use
+    % Prepare for cell classification output
+    %   CC is for "Cell Classification" hereout
+    fprintf(1, 'Starting cell classification\n');
     classify = true;
+    
+    % Check which classifier to use
     if strncmp(classifier, 'k-NN', 4)
         classifier = 'knn';
     elseif strcmp(classifier, 'k-Means')
         classifier = 'kmeans';
-    elseif strncmp(classifer, 'Classif', 7)
+    elseif strncmp(classifier, 'Classif', 7)
         classifier = 'ctree';
+    elseif strncmp(classifier, 'Manual', 6)
+        classifier = 'manual';
     else
         warning('Classifier not correctly found: %s', classifier)
     end
+    dataType = 'innerbins'; % Not giving an option for changing this currently
     
     % Prepare cell matrix
     cellTypes = {'Apoptotic', 'Necrotic', 'Healthy'};
@@ -1003,26 +1034,56 @@ if ~strcmp(classifier, 'Select Classifier')
     combinedCC = cell(1, numel(handles.images)); 
     numCellsCC = 0; 
     allStatsDataCC = num2cell(zeros(1, numel(cellTypes)));
-else
-    classify = false;
-end
-
-
-% Cycle through each iamge and perform actions as requested
-%   Process images, calculate metrics, plot images, classify cells
-for i = 1:numel(handles.images)
     
-    % Process image
-    im = handles.images{i};
-    im.process();
+    % Prepare learning data structures or load learning data as needed
+    % * Note that dataType is fixed as 'innerbins' w/o option for change currently
+    if strcmp(classifier, 'manual');
+        magSpec = zeros(0, 200^2);
+        allbins = zeros(0, 100);
+        innerbins = zeros(0, 100);
+        answers = cell(1, 0);
+    else
+        [data, answers] = Imports.learningData(dataType);
+    end
     
-    % Make apoptosis cell objects and analyze if requested
-    if classify
+    % Analyze images
+    for i = 1:numImages
+        
+        % Segment cells
+        im = handles.images{i};
         im.makeCells('apop', mode, scheme, filterEccen);
+        
+        % Proceed if cells were found
         if ~isempty(im.aCells)
-            am = load('non_adj_H2O2_allMags.mat');
-            an = load('non_adj_H2O2_answers.mat');
-            im.classify(am.allMags, an.answers, classifier);
+            
+            % Check if manually classifying cells (builds learning dataset)
+            if strcmp(classifier, 'manual')
+                
+                % Prepare data for new GUI
+                imNumber = i;
+                aCells = im.aCells;
+                labels = im.labels;
+                image = im.image;
+                save dataForLearning.mat imNumber numImages aCells labels image
+                
+                % Open new GUI
+                fprintf(1, 'Opening manual (Learning) GUI for image %d\n', i);
+                learnGUI = Learning();
+                waitfor(learnGUI)
+                
+                % Load data from closed GUI
+                fprintf(1, 'Returning to analysis\n');
+                results = load('learningResults.mat');
+                im.setCells(results.aCells);
+                magSpec = [magSpec; results.magSpec];       %#ok<AGROW>
+                allbins = [allbins; results.allbins];       %#ok<AGROW>
+                innerbins = [innerbins; results.innerbins]; %#ok<AGROW>
+                answers = [answers, results.answers];       %#ok<AGROW>
+            else
+                % Automatically classify cells
+                fprintf(1, 'Classifying image %d cells\n', i);
+                im.classify(data, answers, classifier, dataType); % dataType fixed as 'innerbins'
+            end
         else
             warning('No cells found in image %d for scoring apoptosis', i);
         end
@@ -1066,9 +1127,54 @@ for i = 1:numel(handles.images)
             imageDataCC];
     end
     
-    % Make damage cell objects and analyze if requested
-    if calcDamage
+    % Combine overall statistics for cell classification
+    fprintf(1, 'Combining Classification Data\n');
+    
+    % Prepare statistics labels
+    allStatsLabelsCC = {
+        'All Images', 'num';
+        sprintf('n = %d', numCellsCC), '%'};
+    
+    % Finalize all cell statistics data
+    percentCellType = num2cell(cell2mat(allStatsDataCC) / numCellsCC * 100);
+    allStatsDataCC = [allStatsDataCC; percentCellType];
+    
+    % Combine all data
+    allDataCC = [
+        titlesCC;
+        allStatsLabelsCC, allStatsDataCC];
+    for extract = combinedCC
+        allDataCC = [allDataCC; extract{:}]; %#ok<AGROW>
+    end
+else
+    classify = false;
+end
+
+% Make damage cell objects and analyze if requested
+if ~isempty(damageCalcs) 
+    
+    % Prepare cell matrix for DNA damage Excel output
+    %   DD is for "DNA Damage" hereout
+    fprintf(1, 'Starting DNA damage analysis\n');
+    calcDamage = true;
+    if strcmp(damageCalcs{1}, 'all')
+        metricsUsed = metrics;
+    else
+        metricsUsed = damageCalcs;
+    end
+    titlesDD = [{'Image #', 'Cell #'}, metricsUsed];
+    combinedDD = cell(1, numel(handles.images));
+    numCellsDD = 0; 
+    allStatsDataDD = cell(0, numel(metricsUsed));
+    
+    % Analyze images
+    for i = 1:numImages
+        
+        % Segment Cells
+        im = handles.images{i};
         im.makeCells('dmg', mode, scheme, filterEccen);
+        
+        % Proceed if cells were found
         if ~isempty(im.dCells)
             im.calcDamage(damageCalcs{:});
         else
@@ -1116,41 +1222,8 @@ for i = 1:numel(handles.images)
             imageDataDD];
     end
     
-    % Plot requested figures
-    if ~isempty(damagePlots)
-        im.plotDamage(damagePlots{:})
-    end
-    if ~isempty(imagePlots)
-        im.plot(imagePlots{:})
-    end
-    if get(handles.plotClass, 'value')
-        im.plotTypes();
-    end
-end
-
-% Combine overall statistics for cell classification
-if classify
-    
-    % Prepare statistics labels
-    allStatsLabelsCC = {
-        'All Images', 'num';
-        sprintf('n = %d', numCellsCC), '%'};
-    
-    % Finalize all cell statistics data
-    percentCellType = num2cell(cell2mat(allStatsDataCC) / numCellsCC * 100);
-    allStatsDataCC = [allStatsDataCC; percentCellType];
-    
-    % Combine all data
-    allDataCC = [
-        titlesCC;
-        allStatsLabelsCC, allStatsDataCC];
-    for extract = combinedCC
-        allDataCC = [allDataCC; extract{:}]; %#ok<AGROW>
-    end
-end
-
-% Compute overall statistics for DNA damage
-if calcDamage
+    % Compute overall statistics for DNA damage
+    fprintf(1, 'Combining DNA Damage Data\n');
     
     % Prepare statistics labels
     allStatsLabelsDD = {
@@ -1174,8 +1247,25 @@ if calcDamage
     for extract = combinedDD
         allDataDD = [allDataDD; extract{:}]; %#ok<AGROW>
     end
+else
+    calcDamage = false;
+end
+    
+% Plot requested figures
+fprintf(1, 'Plotting requested figures\n');
+for im = handles.images
+    if ~isempty(damagePlots)
+        im{:}.plotDamage(damagePlots{:})
+    end
+    if ~isempty(imagePlots)
+        im{:}.plot(imagePlots{:})
+    end
+    if get(handles.plotClass, 'value')
+        im{:}.plotTypes();
+    end
 end
 
+% --- Save output files --- %
 
 % Make filenames for CSV output
 if handles.customName
@@ -1194,13 +1284,28 @@ fullfileDD = strcat(handles.outdir, filename, ' damage', '.csv');
 fullfileCC = strcat(handles.outdir, filename, ' classification', '.csv');
 
 % Write files to CSV in standard output
+fprintf(1, 'Writing Data to CSV File(s)\n');
 out = Exports();
 if calcDamage
-    out.writeCSV(fullfileDD, allDataDD);
+    out.haloData(fullfileDD, allDataDD);
 end
 if classify
-    out.writeCSV(fullfileCC, allDataCC);
+    out.haloData(fullfileCC, allDataCC);
 end
+
+% Save configuration data
+fprintf(1, 'Saving configuration data\n');
+out.saveConfig(handles);
+
+% Process and save learning data
+if classify && strcmp(classifier, 'manual')
+    fprintf(1, 'Saving learning data\n');
+    out.learningData(magSpec, allbins, innerbins, answers);
+end
+
+% Finished Message
+t = toc;
+fprintf(1, 'Finished in %.2f seconds!\n', t);
 
 
 
@@ -1215,7 +1320,7 @@ end
 % --- Executes during object creation, after setting all properties.
 function lowerSlider_CreateFcn(hObject, ~, handles)
 % hObject    handle to lowerSlider (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: slider controls usually have a light gray background.
@@ -1227,7 +1332,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function upperSlider_CreateFcn(hObject, ~, handles)
 % hObject    handle to upperSlider (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: slider controls usually have a light gray background.
@@ -1239,7 +1344,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function sampleName_CreateFcn(hObject, ~, handles)
 % hObject    handle to sampleName (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1252,7 +1357,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function sampleNumber_CreateFcn(hObject, ~, handles)
 % hObject    handle to sampleNumber (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1265,7 +1370,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function outputPath_CreateFcn(hObject, ~, handles)
 % hObject    handle to outputPath (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1278,7 +1383,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function imageMenu_CreateFcn(hObject, ~, handles)
 % hObject    handle to imageMenu (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -1291,7 +1396,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function upperThresh_CreateFcn(hObject, ~, handles)
 % hObject    handle to upperThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1304,7 +1409,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function lowerThresh_CreateFcn(hObject, ~, handles)
 % hObject    handle to lowerThresh (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1317,7 +1422,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function eccenMetric_CreateFcn(hObject, ~, handles)
 % hObject    handle to eccenMetric (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
@@ -1330,14 +1435,14 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function segmentationPanel_CreateFcn(hObject, ~, handles)
 % hObject    handle to segmentationPanel (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 guidata(hObject, handles)
 
 % --- Executes during object creation, after setting all properties.
 function scheme_CreateFcn(hObject, ~, handles)
 % hObject    handle to scheme (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: popupmenu controls usually have a white background on Windows.
@@ -1350,7 +1455,7 @@ guidata(hObject, handles)
 % --- Executes during object creation, after setting all properties.
 function mode_CreateFcn(hObject, ~, handles)
 % hObject    handle to mode (see GCBO)
-% ~  reserved - to be defined in a future version of MATLAB
+% eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: popupmenu controls usually have a white background on Windows.

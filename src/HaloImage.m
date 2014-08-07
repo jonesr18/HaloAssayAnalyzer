@@ -12,6 +12,7 @@ classdef HaloImage < handle
     %       process     - Processes the image to prepare it for segmentation. 
     %       setCriteria - Sets the criteria for exclusion of cells by eccentricity metric.
     %       makeCells   - Segments cells in the image & creates a cell array of appropriate objects.
+    %       setCells    - Sets the fields 'aCells' and 'dCells' to appropriately passed arrays.
     %       calcDamage  - Calcuates the desired DNA damage parameters and statistics for each cell 
     %                     in the image.
     %       classify    - Classifies cells as apoptotic, healthy, and necrotic.
@@ -39,7 +40,7 @@ classdef HaloImage < handle
     % You should have received a copy of the GNU General Public License along with this program. If
     % not see http://www.gnu.org/licenses/gpl.html
     % 
-    % Updated 6.29.14
+    % Updated 8.6.14
     
     properties (SetAccess = private)
         % Image properties
@@ -69,6 +70,7 @@ classdef HaloImage < handle
     
     properties (Access = private)
         processed;  % Becomes true once process() is called
+        reset;      % Becomes true when setThresh() or setMinSize() are called
     end
     
     methods (Access = public)
@@ -86,9 +88,10 @@ classdef HaloImage < handle
             
             % Assign fields
             self.image = image;
+            self.criteria = .500;       % default value
+            self.minSize = 300;         % default value
             self.processed = false;
-            self.criteria = .500;   % default value
-            self.minSize = 300;     % default value
+            self.reset = false;
             
             % Check if image requires inversion
             bwTest = im2bw(image, graythresh(image));
@@ -181,7 +184,7 @@ classdef HaloImage < handle
             
             % Check input
             validateattributes(lower, {'numeric'}, {}, mfilename, 'lower', 1);
-            validateatrributes(upper, {'numeric'}, {}, mfilename, 'upper', 2);
+            validateattributes(upper, {'numeric'}, {}, mfilename, 'upper', 2);
             
             % Force levels to be an integer between 0 and 255
             lower = uint8(lower);
@@ -229,7 +232,7 @@ classdef HaloImage < handle
             %   hImage.process()
             
             % Warn if image has already been processed
-            if self.processed
+            if self.processed && ~self.reset
                 warning('Image has already been processed');
             end
             
@@ -261,8 +264,9 @@ classdef HaloImage < handle
             Ix = imfilter(double(self.image), hy', 'replicate');
             self.gradmag = sqrt(Ix.^2 + Iy.^2);
                                     
-            % Update field
+            % Update fields
             self.processed = true;
+            self.reset = false;
         end      
         
         
@@ -440,6 +444,67 @@ classdef HaloImage < handle
             end
         end
         
+    %% public void setCells(cell)
+        function [] = setCells(self, cellArray)
+            % Sets the fields 'aCells' and 'dCells' to appropriately passed arrays.
+            %
+            %   The image must be processed before this method can be called, otherwise an error
+            %   will be thrown. To do so, call the method process().
+            %
+            %   For a HaloImage object with handle 'hImage':
+            %
+            %   hImage.setCells(cellArray)
+            %   
+            %       cellArray can be a cell array of ApopCell or DmgCell objects. Depending on which
+            %       type of object is contianed in the array, the method will replace the field
+            %       'aCells' or 'dCells' with the array given. An error will be thrown if all
+            %       objects in the cell array are not of the same class.
+            %
+            %   Apoptosis cells are stored in the field 'aCells'.
+            %   Damage cells are stored in the field 'dCells'.
+            %
+            %   If aCells are given classified, the field 'cellTypes' will be updated accordingly.
+            
+            % Ensure image has been processed
+            if ~self.processed
+                error(['Image must be processed before cells can be made.\n',...
+                       'Call the method process() before continuing.']);
+            end
+            
+            % Check input
+            validateattributes(cellArray, {'cell'}, {}, mfilename, 'cellArray', 1);
+            if isa(cellArray{1}, 'DmgCell')
+                arrayType = 'dCells';
+            else
+                arrayType = 'aCells';
+            end
+            
+            % Check every cell in array is of consistent type
+            if strcmp(arrayType, 'dCells')
+                for i = 1:numel(cellArray)
+                    if ~isa(cellArray{i}, 'DmgCell')
+                        error('cellArray does not contain consistent cell object types');
+                    end
+                end
+            else
+                classifications = cell(1, numel(cellArray));
+                for i = 1:numel(cellArray)
+                    if ~isa(cellArray{i}, 'ApopCell')
+                        error('cellArray does not contain consistent cell object types');
+                    end
+                    classifications{i} = cellArray{i}.cellType;
+                end
+                
+                % Save number of each cell type if applicable
+                for type = {'apoptotic', 'necrotic', 'healthy', 'ignored'}
+                    self.cellTypes.(type{:}) = sum(strcmp(classifications, type{:}));
+                end
+            end
+            
+            % Set appropriate field
+            self.(arrayType) = cellArray;
+        end
+        
     %% public void calcDamage(<string>)
         function [] = calcDamage(self, varargin)
             % Calcuates the desired DNA damage parameters and statistics for each cell in the image.
@@ -500,7 +565,7 @@ classdef HaloImage < handle
         end
         
     %% public void classify(uint8, string, <string>)
-        function [] = classify(self, allMags, answers, varargin)
+        function [] = classify(self, data, answers, varargin)
             % Classifies cells as apoptotic, healthy, and necrotic.
             %
             %   ApopCell objects must be created prior to using this method, otherwise an error will
@@ -508,25 +573,32 @@ classdef HaloImage < handle
             %
             %   For a HaloImage object with handle 'hImage':
             %
-            %   hImage.classify(allMags, answers)
+            %   hImage.classify(data, answers)
             %
-            %       Builds a classifier (k-nearest neighbors by default) using the data from allMags
-            %       and answers. allMags is a N x 100 matrix contianing magnitude spectrum data from
-            %       N scored cells. answers is a N x 1 character array of answers which must use the
-            %       letters 'a', 'n', and 'c' to represent apoptotic, necrotic, and healthy cells,
-            %       respectively.
+            %       Builds a classifier (k-nearest neighbors by default) using the given data and
+            %       answers. 'data' is a N x M matrix contianing M degrees of magnitude spectrum
+            %       data from N scored cells. 'answers' is an N x 1 cell array of answers which can
+            %       only contain the strings 'apoptotic', 'necrotic', 'healthy', and 'ignored'.
             %
             %       The classifier is used to label each ApopCell in the field 'aCells' as either
-            %       'apoptotic', 'necrotic', 'healthy', or 'ignored' if the cell type does not
-            %       sufficiently match any of these choices.
+            %       'apoptotic', 'necrotic', 'healthy' or 'ignored'.
             %
-            %   hImage.classify(allMags, answers, classifier)
+            %   hImage.classify(data, answers, OPTIONS)
             %
-            %       The classifier can be set to be any of the following:
+            %       The following strings can be passed as options:
             %
-            %           'knn'       - k-nearest neighbors algorithm (default)
+            %           Select Classifier:
+            %           'knn'       - k-nearest neighbors algorithm                     (default)
             %           'kmeans'    - k-means algoritm*
             %           'ctree'     - classification (decision) tree
+            %
+            %           Select Data Types:
+            %           'magspec'   - use select frequencies of magnitude spectrum
+            %                         * Note that if this option is selected, then a Mx1 matrix of
+            %                           frequency coordinates must be passed as well. Coordinates
+            %                           are indexes of the 1D reshaped frequency spectrum.
+            %           'allbins'   - use binned magnitude spectrum
+            %           'innerbins' - use binned inner magnitude spectrum               (defualt)
             %
             %           * will not give 'ignored' as an answer
             %
@@ -541,76 +613,33 @@ classdef HaloImage < handle
             end
             
             % Check inputs
-            narginchk(3, 4);
-            if isempty(varargin)
-                classifier = 'knn'; % Default is KNN classifier
-            else
-                c = lower(varargin{1});
-                validatestring(c, {'knn', 'kmeans', 'ctree'}, mfilename, 'classifier', 3);
-                classifier = c;
-            end
+            narginchk(3, 6);
+            [classifier, dataType, freqCoords] = checkClassifyInputs(varargin{:});
+            %   Note that freqCoords is returned empty if not using 'magspec' dataType
             
-            % Compile magnitude specturms of classification data
-            numCells = length(answers);
-            index = 0;
-            compMags = zeros(10, 10, numCells);
-            for mags = allMags
-                mag = mags{:};
-                if ~isempty(mag)
-                    for i = 1:size(mag, 3)
-                        index = index + 1;
-                        compMags(:, :, index) = mag(:, :, i);
-                    end
-                end
-            end
-
-            % Reshape classification data
-            shifted = shiftdim(compMags, 2);
-            data = reshape(shifted, size(compMags, 3), []);
-            a = answers == 'a';
-            n = answers == 'n';
-            c = answers == 'c';
+            % Find indexes of each cell type in data
+            a = strcmp(answers, 'apoptotic');
+            n = strcmp(answers, 'necrotic');
+            h = strcmp(answers, 'healthy');
+            i = strcmp(answers, 'ignored');
             
             % Make desired classifier and classify cells accordingly
+            predictions = cell(1, numel(self.aCells));
             switch classifier
                 case 'knn'
                     % Classifies cells based on known data that is most similar by distance.
                     
                     % Build classifier
-                    knn = ClassificationKNN.fit(data, answers', 'DistanceWeight', 'squaredinverse');
+                    knn = ClassificationKNN.fit(data, answers, 'DistanceWeight', 'squaredinverse');
                     
                     % Classify each cell
-                    nApop = 0;
-                    nNecr = 0;
-                    nCont = 0;
-                    nIgnr = 0;
-                    for aCell = self.aCells
-                        [~, magbins] = aCell{:}.fft();
-                        cellData = reshape(magbins', [], 100);
+                    for j = 1:length(self.aCells)
+                        [fourier, allbins, innerbins] = self.aCells{j}.fft();
+                        cellData = makeCellData(dataType, freqCoords);
                         prediction = knn.predict(cellData);
-                        switch prediction
-                            case 'a'
-                                aCell{:}.setType('apoptotic');
-                                nApop = nApop + 1;
-                            case 'n'
-                                aCell{:}.setType('necrotic');
-                                nNecr = nNecr + 1;
-                            case 'c'
-                                aCell{:}.setType('healthy');
-                                nCont = nCont + 1;
-                            case 'b'
-                                aCell{:}.setType('ignored');
-                                nIgnr = nIgnr + 1;
-                            otherwise
-                                aCell{:}.setType('ignored');
-                                nIgnr = nIgnr + 1;
-                        end
+                        self.aCells{j}.setType(prediction{:});
+                        predictions(j) = prediction;
                     end
-                    self.cellTypes.apoptotic = nApop;
-                    self.cellTypes.necrotic = nNecr;
-                    self.cellTypes.healthy = nCont;
-                    self.cellTypes.ignored = nIgnr;
-                    
                 case 'kmeans'
                     % Makes a classifier using supervised K-means clustering. Cells are classified
                     % based on which Voronoi fragment they belong to. 
@@ -618,34 +647,25 @@ classdef HaloImage < handle
                     % Find centroids of each cluster
                     [~, cn_a] = kmeans(data(a, :), 3, 'replicates', 3);
                     [~, cn_n] = kmeans(data(n, :), 3, 'replicates', 3);
-                    [~, cn_c] = kmeans(data(c, :), 3, 'replicates', 3);
+                    [~, cn_h] = kmeans(data(h, :), 3, 'replicates', 3);
+                    [~, cn_i] = kmeans(data(i, :), 3, 'replicated', 3);
+                    
+                    % Create lookup array for quick prediction reference
+                    lookup = cell(1, 12);
+                    lookup(1:3) = {'apoptotic'};    lookup(4:6) = {'necrotic'}; 
+                    lookup(7:9) = {'healthy'};      lookup(10:end) = {'ignored'};
                     
                     % Classify each cell
-                    nApop = 0;
-                    nNecr = 0;
-                    nCont = 0;
-                    for aCell = self.aCells
-                        [~, magbins] = aCell{:}.fft();
-                        cellData = reshape(magbins', 100, []);
-                        dists = dist([cellData, cn_a', cn_n', cn_c']);
-                        dists = dists(2 : end, 1 : 1);
+                    for j = 1:numel(self.aCells)
+                        [fourier, allbins, innerbins] = self.aCells{j}.fft();
+                        cellData = makeCellData(dataType, freqCoords);
+                        dists = dist([cellData, cn_a', cn_n', cn_h', cn_i']);
+                        dists = dists(2:end, 1:end - 1); % TODO fix
                         [~, idx] = min(dists);
-                        switch idx
-                            case {1, 2, 3}
-                                aCell{:}.setType('apoptotic');
-                                nApop = nApop + 1;
-                            case {4, 5, 6}
-                                aCell{:}.setType('necrotic');
-                                nNecr = nNecr + 1;
-                            case {7, 8, 9}
-                                aCell{:}.setType('healthy');
-                                nCont = nCont + 1;
-                        end
-                    end
-                    self.cellTypes.apoptotic = nApop;
-                    self.cellTypes.necrotic = nNecr;
-                    self.cellTypes.healthy = nCont;
-                    
+                        prediction = lookup{idx};
+                        self.aCells{j}.setType(prediction);
+                        predictions{j} = prediction;
+                    end                    
                 case 'ctree'
                     % Makes a decision tree to classify cell based on known data.
                     
@@ -653,36 +673,89 @@ classdef HaloImage < handle
                     tree = ClassificationTree.fit(data, answers');
                     
                     % Classify each cell
-                    nApop = 0;
-                    nNecr = 0;
-                    nCont = 0;
-                    nIgnr = 0;
-                    for aCell = self.aCells
-                        [~, magbins] = aCell{:}.fft();
-                        cellData = reshape(magbins', 100, []);
+                    for j = 1:numel(self.aCells)
+                        [fourier, allbins, innerbins] = self.aCells{j}.fft();
+                        cellData = makeCellData(dataType, freqCoords);
                         prediction = tree.predict(cellData);
-                        switch prediction
-                            case 'a'
-                                aCell{:}.setType('apoptotic');
-                                nApop = nApop + 1;
-                            case 'n'
-                                aCell{:}.setType('necrotic');
-                                nNecr = nNecr + 1;
-                            case 'c'
-                                aCell{:}.setType('healthy');
-                                nCont = nCont + 1;
-                            case 'b'
-                                aCell{:}.setType('ignored');
-                                nIgnr = nIgnr + 1;
-                            otherwise
-                                aCell{:}.setType('ignored');
-                                nIgnr = nIgnr + 1;
+                        self.aCells{j}.setType(prediction{:});
+                        predictions(j) = prediction;                    
+                    end
+            end
+            
+            % Save number of each cell type
+            for type = {'apoptotic', 'necrotic', 'healthy', 'ignored'}
+                self.cellTypes.(type{:}) = sum(strcmp(predictions, type{:}));
+            end
+            
+            
+            % Checks the inputs for this function
+            function [classifier, dataType, freqCoords] = checkClassifyInputs(varargin)
+                
+                % Validate data and answers
+                validateattributes(data, {'numeric'}, {'positive'}, mfilename, 'allMags', 1);
+                validateattributes(answers, {'cell'}, {}, mfilename, 'answers', 2);
+                [nObs, nDeg] = size(data);
+                if nObs ~= numel(answers)
+                    error(['Mismatched number of observations in data and answers',...
+                        'Data: %d\nAnswers: %d\n'], nObs, numel(answers));
+                end
+                
+                % Check for optional inputs
+                if isempty(varargin)
+                    classifier = 'knn';         % Default is KNN classifier
+                    dataType = 'innerbins';     % Default is to use inner bins
+                else
+                    for k = 1:numel(varargin)
+                        if ischar(varargin{k})
+                            arg = lower(varargin{k});
+                            if any(strcmp(arg, {'knn', 'kmeans', 'ctree'}));
+                                % Classifier option
+                                classifier = arg;
+                            elseif any(strcmp(arg, {'magspec', 'allbins', 'innerbins'}))
+                                % Data type option
+                                dataType = arg;
+                            else
+                                % Incorrect option
+                                error('Argument %d did not match any of the following strings: \n%s',...
+                                    k + 3, 'knn, kmeans, ctree, magspec, allbins, innerbins');
+                            end
+                        else
+                            % The only non-string inputs should be frequency coordinates, which must
+                            % be passed if the user selects the 'magspec' data type option
+                            freqCoords = uint64(varargin{k});
+                            validateattributes(freqCoords, {'numeric'}, {'ncols', 2, 'nrows', nDeg},...
+                                mfilename, 'freqCoords', k);
                         end
                     end
-                    self.cellTypes.apoptotic = nApop;
-                    self.cellTypes.necrotic = nNecr;
-                    self.cellTypes.healthy = nCont;
-                    self.cellTypes.ignored = nIgnr;
+                end
+                
+                % Check if frequency coordinates were passed if user is using 'magspec' data type
+                if strcmp(dataType, 'magspec')
+                    if ~exist('freqCoords', 'var')
+                        error(['If using ''magspec'' data type, you must pass freqency coordinates ',...
+                            'to the function']);
+                    end
+                else
+                    freqCoords = [];
+                end
+            end
+            
+            
+            % Makes the cell data for classification purposes
+            function cellData = makeCellData(dataType, freqCoords)
+                switch dataType
+                    case 'magspec'
+                        % Find which frequencies to use
+                        cellData = zeros(1, size(data, 2));
+                        for k = 1:length(cellData)
+                            f = reshape(fourier, 1, []);
+                            cellData(k) = f(freqCoords(k));
+                        end
+                    case 'allbins'
+                        cellData = reshape(allbins, 1, []);
+                    case 'innerbins'
+                        cellData = reshape(innerbins, 1, []);
+                end
             end
         end
         
@@ -812,7 +885,8 @@ classdef HaloImage < handle
             
             % Plot desired metrics
             if isempty(self.damage)
-                error('Damage not calculated')
+                warning('Damage not calculated')
+                return
             end
 
             % Check inputs
@@ -882,7 +956,8 @@ classdef HaloImage < handle
             %   hImage.plotTypes(...)
             
             if isempty(self.cellTypes)
-                error('Cells not classified')
+                warning('Cells not classified')
+                return
             end
             
             % Plot label on each cell

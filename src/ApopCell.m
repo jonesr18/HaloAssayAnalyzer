@@ -30,13 +30,15 @@ classdef ApopCell < handle
     % You should have received a copy of the GNU General Public License along with this program. If
     % not see http://www.gnu.org/licenses/gpl.html
     % 
-    % Updated 7.1.14
+    % Updated 8.6.14
     
     properties (SetAccess = private)
         image;      % Grayscale image
         fourier;    % 2D FFT magnitude spectrum
-        magbins;    % Magnitude spectrum averaged into bins of 10 each
-        cellType;   % The type of cell represented by the region (control, apoptotic, necrotic)
+        magbins;    % 200x200 magnitude spectrum averaged into 100 20x20 bins
+        innerbins;  % 40x40 interior low-frequency magnitude spectrum averaged into 100 4x4 bins
+        cellType;   % The type of cell represented by the region 
+                    %   (healthy, apoptotic, necrotic, ignored)
     end
     
     methods (Access = public)
@@ -56,7 +58,7 @@ classdef ApopCell < handle
             self.image  = image;
         end
         
-    %% public <double, double> fft()
+    %% public <double, double, double> fft()
         function varargout = fft(self)
             % Computes and returns the magnitude spectrum of the fourier transform.
             %
@@ -65,7 +67,7 @@ classdef ApopCell < handle
             %
             %   For an ApopCell object with handle 'aCell':
             %
-            %   [fourier, magbins] = aCell.fft()
+            %   [fourier, magbins, innerbins] = aCell.fft()
             %
             %       Returns the reduced bins of the fourier transform magnitude spectrumm. The first
             %       returned variable can be selectively ignored by replacing it with a ~. Both 
@@ -73,19 +75,27 @@ classdef ApopCell < handle
             %
             %   The magnitude spectrum is stored in the field 'fourier'.
             %   The binned magnitudes are stored in the field 'magbins'.
+            %   The inner binned magnitudes are stored in the field 'innerbins'.
             
             if isempty(self.fourier)
                 self.fourier = abs(fftshift(fft2(double(self.image), 200, 200)));
                 self.magbins = zeros(10, 10);
+                self.innerbins = zeros(10, 10);
                 for i = 1:10
                     for j = 1:10
+                        % Make magbin
                         rows = 20 * (i - 1) + 1 : 20 * i;
                         cols = 20 * (j - 1) + 1 : 20 * j;
                         self.magbins(i, j) = mean(mean(self.fourier(rows, cols)));
+                        
+                        % Make innerbin
+                        rows = 4 * (i - 1) + 81 : 4 * i + 80;
+                        cols = 4 * (j - 1) + 81 : 4 * j + 80;
+                        self.innerbins(i, j) = mean(mean(self.fourier(rows, cols)));
                     end
                 end
             end
-            varargout = {self.fourier, self.magbins};
+            varargout = {self.fourier, self.magbins, self.innerbins};
         end
         
     %% public void setType(string)
@@ -124,6 +134,7 @@ classdef ApopCell < handle
             %           'image'     - Plots the grayscale cell image
             %           'fourier'   - Plots the Fourier transform magnitude spectrum
             %           'magbins'   - Plots the binnned magnitude spectrum
+            %           'innerbins' - Plots the binned inner magnitude spectrum
             %           'all'       - Plots all options
             
             % Check inputs

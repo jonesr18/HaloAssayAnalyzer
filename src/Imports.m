@@ -3,9 +3,10 @@ classdef Imports < handle
     %
     %   Methods (static):
     %
-    %       cometData   - Imports data from a standard comet assay data file.
-    %       haloData    - Imports data from a standard fast halo assay data file.
-    %       images      - Runs a GUI to import one or multiple images.
+    %       cometData    - Imports data from a standard comet assay data file.
+    %       haloData     - Imports data from a standard fast halo assay data file.
+    %       learningData - Imports learning data from a directory selected by the user.
+    %       images       - Runs a GUI to import one or multiple images.
     %
     %   A handle to this object can be created as such:
     %
@@ -27,7 +28,7 @@ classdef Imports < handle
     % You should have received a copy of the GNU General Public License along with this program. If
     % not see http://www.gnu.org/licenses/gpl.html
     % 
-    % Updated 7.1.14
+    % Updated 8.6.14
     
     methods (Static)
     %% public static double, double, <string> cometData(<string>)
@@ -82,7 +83,7 @@ classdef Imports < handle
                 end
             end
 
-            % Extract information from rawData
+            % Extract information from raw data
             statLabels = raw(1:5, 1);
             data = cellStr2mat(raw(7:end, 6 : end - 1));
             stats = cellStr2mat(raw(1:5, 6 : end - 1));
@@ -158,13 +159,106 @@ classdef Imports < handle
                 end
             end
             
-            % Extract information from rawData
+            % Extract information from raw data
             data = cellStr2mat(raw(indices, 3:end));
             stats = cellStr2mat(raw(1:numStatRows, 3:end));
             statLabels = raw(1:numStatRows, 2);
 
             varargout = {labels, statLabels};
             fclose(fileID);
+        end
+        
+    %% public static double, cell, <double> learningData(string)
+        function [data, answers, varargout] = learningData(dataType)
+            % Imports learning data from a directory selected by the user. This method is static and
+            % thus can be invoked without first creating a handle by calling Imports.cometData(...).
+            %
+            %   For an Imports object with handle 'in':
+            %
+            %   [data, answers] = learningData(dataType)
+            %
+            %       Returns the data and answers from the learning dataset selected by the user via
+            %       a folder selection GUI and specified with the string dataType. Data is an NxM
+            %       array, where N is the number of observations and M is a variable for magSpec
+            %       and 100 for both allbins and innerbins, corresponding with the reshaped (and 
+            %       potentially averaged) parts of the magnitude spectrum.
+            %
+            %       Datatype can be any of the following:
+            %
+            %           'magspec'   - Use selected frequencies from the magnitude spectrum
+            %           'allbins'   - Use all frequencies binned into 100 average magnitudes
+            %           'innerbins' - Use just low frequencies binned into 100 average magnitudes
+            %
+            %   [data, answers, freqCoords] = learningData(dataType)
+            %
+            %       Returns the coordinates of selected frequencies in freqCoords. If dataType is
+            %       set to 'magspec', then freqCoords will be a Nx1 vector of points; otherwise, it
+            %       will be left empty.
+            
+            % Let user select directory of data
+            datapath = uigetdir(pwd, 'Learning Dataset Directory');
+            
+            % Get desired data type filename
+            switch dataType
+                case 'magspec'
+                    filename = 'Selected Freqs';
+                    freqCoords = 'Frequency Coords';
+                case 'allbins'
+                    filename = 'All Freq Bins';
+                    freqCoords = [];
+                case 'innerbins'
+                    filename = 'Inner Freq Bins';
+                    freqCoords = [];
+            end
+            
+            % Extract raw data from file
+            fileID1 = fopen(strcat(datapath, '\', filename, '.csv'), 'rt');
+            fileID2 = fopen(strcat(datapath, '\Answers.csv'), 'rt');
+            i = 0;
+            fprintf(1, 'Loaded file: %s\n', fgetl(fileID1));
+            fprintf(1, 'Loaded file: %s\n', fgetl(fileID2));
+            while true
+                i = i + 1;
+                line = fgetl(fileID1);
+                lineAns = fgetl(fileID2);
+                if ischar(line) && ischar(lineAns)
+                    raw(i, :) = regexp(line, ',', 'split');    %#ok<AGROW>
+                    rawAns(i, :) = regexp(lineAns, ',', 'split'); %#ok<AGROW>
+                elseif ~ischar(line) && ~ischar(lineAns)
+                    break
+                else
+                    error('The input files %s and %s do not have the same number of lines.',...
+                        strcat(filename, '.csv'), 'Answers.csv')
+                end
+            end
+            fclose(fileID1);
+            fclose(fileID2);
+            
+            % Load frequency coordinates if requested
+            if ~isempty(freqCoords)
+                fileID3 = fopen(strcat(datapath, '\', freqCoords, '.csv'), 'rt');
+                i = 0;
+                fprintf(1, 'Loaded file: %s\n', fgetl(fileID3));
+                while true
+                    i = i + 1;
+                    line = fgetl(fileID3);
+                    if ischar(line)
+                        rawFC(i, :) = regexp(line, ',', 'split'); %#ok<AGROW>
+                    else
+                        break
+                    end
+                end
+                fclose(fileID3);
+            end
+            
+            % Extract information from raw data
+            data = cellStr2mat(raw);
+            answers = rawAns;
+            if ~isempty(freqCoords)
+                freqCoords = cellStr2mat(rawFC);
+            end
+            
+            varargout = {freqCoords};
         end
         
     %% public static cell imArray()

@@ -9,9 +9,7 @@ close all
 clc
 
 imArray = Imports.images();
-
-allMags = cell(1, numel(imArray));
-answers = '';
+index = 0;
 for i = 1:numel(imArray)
     image = imArray{i};
     cells = HaloImage(image);
@@ -19,24 +17,50 @@ for i = 1:numel(imArray)
     try
         cells.process();
         cells.makeCells('apop', 'bw', 'grad', true);
-        mags = zeros(10, 10, numel(cells.aCells));
         figure(1), imshow(cells.image, [])
         for j = 1:numel(cells.aCells)
+            
+            % Extract data, get classification
             aCell = cells.aCells{j};
-            [fourier, magbins] = aCell.fft();
-            figure(4), imshow(aCell.image, [])
-            figure(5), imshow(fourier, [0, 10000])
-            mags(:, :, j) = magbins;
-            answers = strcat(answers, input('Cell type? (a/n/c/d)\n', 's'));
+            [fourier, magbins, innerbins] = aCell.fft();
+            figure(2), imshow(aCell.image, [])
+            figure(3), imshow(fourier, [0, 10000])
+            answer = input('Cell type? (a/n/h/i)\n', 's');
+            
+            % Store data - reshaping changes data like so:
+            %  [A1 A2 A3
+            %   B1 B2 B3    --->   [A1 B1 C1 A2 B2 C2 A3 B3 C3]
+            %   C1 C2 C3]
+            index = index + 1;
+            magSpec(index, :) = reshape(fourier, 1, []);        %#ok<SAGROW>
+            allMags(index, :) = reshape(magbins, 1, []);        %#ok<SAGROW>
+            innerMags(index, :) = reshape(innerbins, 1, []);    %#ok<SAGROW>
+            switch answer
+                case 'a'
+                    answer = 'apoptotic';
+                case 'n'
+                    answer = 'necrotic';
+                case 'h'
+                    answer = 'healthy';
+                case 'i'
+                    answer = 'ignored';
+            end
+            answers{index} = answer; %#ok<SAGROW>
         end
-        allMags{i} = mags;
     catch
         warning('Threshold not found for image %d', 2 * i)
     end
 end
 
+f = datestr(now);
+f(f == ':') = ';';
+f(f == '-') = ' ';
+filename = [f, ' Learning Data.mat'];
+
+save filename magSpec allMags innerMags answers
 
 %% Compile Data
+% Used previously - not in use anymore
 clc
 
 % -- Dataset non-adj camera H2O2 -- %
@@ -112,10 +136,11 @@ end
 % Reshape data
 shifted = shiftdim(compMags, 2);
 data = reshape(shifted, size(compMags, 3), []);
-a = find(answers == 'a');
-n = find(answers == 'n');
-c = find(answers == 'c');
-d = find(answers == 'd');
+a = answers == 'a';
+n = answers == 'n';
+c = answers == 'h' | answers == 'c';
+d = answers == 'd';
+i = answers == 'i' | answers == 'b';
 
 
 %% Principal Component Analysis

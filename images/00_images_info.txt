@@ -13,9 +13,9 @@ X-ray for A172.tiff
 
 The Singh Lab supplied the following images:
 
-100 uM H2O2 Image 1.tiff
-100 uM H2O2 Image 2.tiff
-100 uM H2O2 Image 3.tiff
-100 uM H2O2 Image 4.tiff
-100 uM H2O2 Image 5.tiff
-100 uM H2O2 Image 6.tiff
+100 uM H2O2 Image-1.tiff
+100 uM H2O2 Image-2.tiff
+100 uM H2O2 Image-3.tiff
+100 uM H2O2 Image-4.tiff
+100 uM H2O2 Image-5.tiff
+100 uM H2O2 Image-6.tiff

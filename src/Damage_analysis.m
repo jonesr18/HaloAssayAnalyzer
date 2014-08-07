@@ -3,14 +3,15 @@ close all
 clear all
 clc
 
-% Import data
-doses = [0, 25, 50, 100, 200, 500];
+% Import data -- some things are changed for each experiment
+doses = [0, 25, 50, 100];                                       % Set doses used
+slides = [2, 1, 1, 1];                                          % Set slides used
 numGroups = length(doses);
 data = cell(1, numGroups);
 stats = cell(1, numGroups);
 in = Imports();
 for i = 1:numGroups
-    filename = sprintf('%d uM H2O2 ACA CSV', doses(i));
+    filename = sprintf('07.09.14 %d Rads A%d (EB)', doses(i), slides(i));  % Set filename regexp
     if i == 1
         [data{i}, stats{i}, labels, statLabels] = in.cometData(filename);
     else
@@ -50,6 +51,7 @@ clc
 warning('off', 'stats:lillietest:OutOfRangePLow');
 warning('off', 'stats:lillietest:OutOfRangePHigh');
 
+% Plot histograms with normal theory curve superimposed
 pvals = zeros(numGroups, numel(tests));
 for i = 1:numGroups
     figure()
@@ -69,14 +71,22 @@ end
 close all
 clc
 
-S = [stats{1}; stats{2}; stats{3}; stats{4}; stats{5}; stats{6}];
+% Extract stats
+warning('off', 'MATLAB:catenate:DimensionMismatch');
+S = zeros(0, numel(tests));
+for i = 1:numGroups
+    S = [S; stats{i}]; %#ok<AGROW>
+end
+
+% Plot results
 figure()
 k = 0;
+numStats = numel(statLabels);
 for i = 1:numel(labels)
     if any(strcmpi(labels{i}, tests))
         k = k + 1;
         subplot(3, 3, k)
-        errorbar(doses, S(3:5:end, i), S(4:5:end, i) / 10)
+        errorbar(doses, S(3:numStats:end, i), S(4:numStats:end, i) / 10)
         title(labels{i})
     end
 end
@@ -86,13 +96,15 @@ end
 close all
 clc
 
-doses = [0, 25, 50, 100, 200, 500];
+% Import data -- some things are changed for each experiment
+doses = [0, 25, 50, 100];                                       % Set doses used
+slides = [1, 1, 1, 1];                                          % Set slides used
 numGroups = length(doses);
 data = cell(1, numGroups);
 stats = cell(1, numGroups);
 in = Imports();
 for i = 1:numGroups
-    filename = sprintf('%d uM H2O2 BW GM CSV', doses(i));
+    filename = sprintf('07.08.14 %d rads D%d damage', doses(i), slides(i)); % Set filename regexp
     if i == 1
         [data{i}, stats{i}, labels, statLabels] = in.haloData(filename);
     else
@@ -129,6 +141,7 @@ clc
 warning('off', 'stats:lillietest:OutOfRangePLow');
 warning('off', 'stats:lillietest:OutOfRangePHigh');
 
+% Plot histograms with normal theory curve superimposed
 pvals = zeros(numGroups, numel(labels));
 for i = 1:numGroups
     figure()
@@ -144,11 +157,19 @@ end
 close all
 clc
 
-S = [stats{1}; stats{2}; stats{3}; stats{4}; stats{5}; stats{6}];
+% Extract stats
+warning('off', 'MATLAB:catenate:DimensionMismatch');
+numStats = 3;
+S = zeros(0, numStats);
+for i = 1:numGroups
+    S = [S; stats{i}]; %#ok<AGROW>
+end
+
+% Plot results
 figure()
 for i = 1:numel(labels)
     subplot(3, 3, i)
-    errorbar(doses, S(1:3:end, i), S(3:3:end, i))
+    errorbar(doses, S(1:numStats:end, i), S(3:numStats:end, i))
     title(labels{i})
 end
 
