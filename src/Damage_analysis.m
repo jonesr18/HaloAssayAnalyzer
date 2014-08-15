@@ -4,19 +4,28 @@ clear all
 clc
 
 % Import data -- some things are changed for each experiment
-doses = [0, 25, 50, 100];                                       % Set doses used
-slides = [2, 1, 1, 1];                                          % Set slides used
+doses = [0, 25, 50, 100]; % Set doses used
 numGroups = length(doses);
 data = cell(1, numGroups);
 stats = cell(1, numGroups);
 in = Imports();
 for i = 1:numGroups
-    filename = sprintf('07.09.14 %d Rads A%d (EB)', doses(i), slides(i));  % Set filename regexp
+    % Set filename regexp
+    filename1 = sprintf('07.30.14 %d rads C1 (EB)', doses(i));
+    filename2 = sprintf('07.30.14 %d rads C2 (EB)', doses(i));
+    filename3 = sprintf('07.31.14 %d rads C1 (EB)', doses(i));
+    filename4 = sprintf('07.31.14 %d rads C2 (EB)', doses(i));
     if i == 1
-        [data{i}, stats{i}, labels, statLabels] = in.cometData(filename);
+        [data1, ~, labels, statLabels] = in.cometData(filename1);
     else
-        [data{i}, stats{i}] = in.cometData(filename);
+        [data1, ~] = in.cometData(filename1);
     end
+    [data2, ~] = in.cometData(filename2);
+    [data3, ~] = in.cometData(filename3);
+    [data4, ~] = in.cometData(filename4);
+    combData = [data1; data2; data3; data4];
+    data{i} = combData;
+    stats{i} = [min(combData); max(combData); mean(combData); std(combData); median(combData)];
 end
 tests = {'Comet extent', 'Comet total intensity', 'Comet total area', 'Tail DNA[%]', 'Tail extent',...
          'Tail distributed moment (DNA migration)', 'Tail extent moment', 'Tail area (Singh)',...
@@ -82,11 +91,12 @@ end
 figure()
 k = 0;
 numStats = numel(statLabels);
+N = 400; % number of cells scored per dose
 for i = 1:numel(labels)
     if any(strcmpi(labels{i}, tests))
         k = k + 1;
         subplot(3, 3, k)
-        errorbar(doses, S(3:numStats:end, i), S(4:numStats:end, i) / 10)
+        errorbar(doses, S(3:numStats:end, i), S(4:numStats:end, i) / sqrt(N)) % Bars are SEM
         title(labels{i})
     end
 end
@@ -97,19 +107,29 @@ close all
 clc
 
 % Import data -- some things are changed for each experiment
-doses = [0, 25, 50, 100];                                       % Set doses used
-slides = [1, 1, 1, 1];                                          % Set slides used
+doses = [0, 25, 50, 100]; % Set doses used
 numGroups = length(doses);
 data = cell(1, numGroups);
 stats = cell(1, numGroups);
 in = Imports();
 for i = 1:numGroups
-    filename = sprintf('07.08.14 %d rads D%d damage', doses(i), slides(i)); % Set filename regexp
+    filename1 = sprintf('07.30.14 %d rads D1 (EB) damage', doses(i));
+    filename2 = sprintf('07.30.14 %d rads D2 (EB) damage', doses(i));
+    filename3 = sprintf('07.31.14 %d rads D1 (EB) damage', doses(i));
+    filename4 = sprintf('07.31.14 %d rads D2 (EB) damage', doses(i));
     if i == 1
-        [data{i}, stats{i}, labels, statLabels] = in.haloData(filename);
+        [data1, ~, labels, statLabels] = in.haloData(filename1);
     else
-        [data{i}, stats{i}] = in.haloData(filename);
+        [data1, ~] = in.haloData(filename1);
     end
+    [data2, ~] = in.haloData(filename2);
+    [data3, ~] = in.haloData(filename3);
+    [data4, ~] = in.haloData(filename4);
+    combData = [data1; data2; data3; data4];
+    data{i} = combData;
+    N = size(combData, 1);
+    stats{i} = [mean(combData); std(combData); std(combData) / sqrt(N)]; % Last is SEM
+    fprintf(1, 'Dose: %d\nN: %d\n', doses(i), N);
 end
 
 % Format data into struct
@@ -169,50 +189,10 @@ end
 figure()
 for i = 1:numel(labels)
     subplot(3, 3, i)
-    errorbar(doses, S(1:numStats:end, i), S(3:numStats:end, i))
+    errorbar(doses, S(1:numStats:end, i), S(3:numStats:end, i)) % Bars are SEM
     title(labels{i})
 end
 
-
-%% Cell Counts
-close all
-clc
-
-doses = [0, 25, 50, 100, 200, 500];
-hours = [0, 24, 48];
-
-countData = struct();
-data = xlsread('Counting Data.xlsx');
-for i = 2:2:size(data, 1)
-    for j = 1:size(data, 2)
-        D = sprintf('d%d', doses(i / 2));   % Dose
-        H = sprintf('hr%d', hours(j));      % Time point
-        countData.(D).(H).live = data(i - 1, j);
-        countData.(D).(H).dead = data(i, j);
-    end
-end
-
-
-%% CC Dose Response
-close all
-clc
-
-colors = 'mrgcbk';
-
-figure(), hold on
-for i = 2:2:size(data, 1)
-    plot(hours, data(i - 1, :) / data(i - 1, 1), colors(i / 2))
-end
-for i = 2:2:size(data, 1)
-    plot(hours, data(i, :) / data(i, 1), [colors(i / 2), '--'])
-end
-xlabel('Hours')
-ylabel('# of Cells Relative to 0 hr')
-leg = cell(1, length(doses));
-for i = 1:length(doses)
-    leg{i} = sprintf('%d uM H_2O_2', doses(i));
-end
-legend(leg)
 
 
 %% Compare FHA and ACA Results
@@ -338,8 +318,59 @@ h.ColumnLabels = nameACA;
 h.RowLabels = labFHA;
 
 
+%% Write corrs to file
+clc
+
+fileID = fopen(strcat(pwd, '\Data\Correlations.csv'), 'wt');
+fprintf(fileID, ',');
+fprintf(fileID, '%s,', nameACA{1:end-1});
+fprintf(fileID, '%s\n', nameACA{end});
+for i = 1:size(corrs, 1)
+    fprintf(fileID, '%s,', labFHA{i});
+    fprintf(fileID, '%d,', corrs(i, 1:end-1));
+    fprintf(fileID, '%d\n', corrs(i, end));
+end
+fclose(fileID);
 
 
+%% Cell Counts
+close all
+clc
 
+doses = [0, 25, 50, 100, 200, 500];
+hours = [0, 24, 48];
+
+countData = struct();
+data = xlsread('Counting Data.xlsx');
+for i = 2:2:size(data, 1)
+    for j = 1:size(data, 2)
+        D = sprintf('d%d', doses(i / 2));   % Dose
+        H = sprintf('hr%d', hours(j));      % Time point
+        countData.(D).(H).live = data(i - 1, j);
+        countData.(D).(H).dead = data(i, j);
+    end
+end
+
+
+%% CC Dose Response
+close all
+clc
+
+colors = 'mrgcbk';
+
+figure(), hold on
+for i = 2:2:size(data, 1)
+    plot(hours, data(i - 1, :) / data(i - 1, 1), colors(i / 2))
+end
+for i = 2:2:size(data, 1)
+    plot(hours, data(i, :) / data(i, 1), [colors(i / 2), '--'])
+end
+xlabel('Hours')
+ylabel('# of Cells Relative to 0 hr')
+leg = cell(1, length(doses));
+for i = 1:length(doses)
+    leg{i} = sprintf('%d uM H_2O_2', doses(i));
+end
+legend(leg)
 
 

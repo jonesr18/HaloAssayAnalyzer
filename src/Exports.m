@@ -27,7 +27,9 @@ classdef Exports < handle
     % You should have received a copy of the GNU General Public License along with this program. If
     % not see http://www.gnu.org/licenses/gpl.html
     % 
-    % Updated 8.6.14
+    % Updated 8.13.14
+    % > TODO Make the methods take data from aCell/dCell arrays and save it automatically. Much
+    %   easier for the user.
     
     methods (Static)
     %% public static void haloData(string, cell)
@@ -93,24 +95,27 @@ classdef Exports < handle
             %       answers     - Manual cell classification
             %
             %   Each of magSpec, allbins, and innerbins is and N x M array, where N is the number of
-            %   observations, corresponding with the length of answers. M is variable for magSpec
-            %   and 100 for both allbins and innerbins, corresponding with the reshaped (and 
-            %   potentially averaged) parts of the magnitude spectrum.
-
+            %   observations, corresponding with the length of answers. M is 40,000 for magSpec and
+            %   100 for both allbins and innerbins, corresponding with the reshaped (and potentially
+            %   averaged) parts of the magnitude spectrum.
+            %
+            %   Filenames of saved files are 'All Freqs', 'All Freq Bins', 'Inner Freq Bins', and
+            %   'Answers', all of which are .csv files. The first line of each file includes the
+            %   date and time from when the data was saved.
+            %
+            %   Numerical values are saved to 2 decimal places of precision.
             
             % Check inputs
             validateattributes(magSpec, {'numeric'}, {'>=' 0}, mfilename, 'magSpec', 2);
             validateattributes(allbins, {'numeric'}, {'ncols', 100, '>=' 0}, mfilename, 'allbins', 3);
             validateattributes(innerbins, {'numeric'}, {'ncols', 100, '>=', 0}, mfilename, 'innerbins', 4);
             validateattributes(answers, {'cell'}, {}, mfilename, 'answers', 5);
-            freqCoords = findFreqCoords(magSpec, answers);
-            selMags = magSpec(:, freqCoords);
             
             % Validate size of input
             nAns = numel(answers);
             errmsg = 'The number of observations and answers must be the same.\nnObs (%s): %d\nnAns: %d';
-            namepairs = {'Selected Freqs', 'All Freq Bins', 'Inner Freq Bins'
-                          selMags,          allbins,         innerbins};
+            namepairs = {'All Freqs', 'All Freq Bins', 'Inner Freq Bins'
+                          magSpec,     allbins,         innerbins};
             for i = 1:size(namepairs, 2)
                 if nAns ~= size(namepairs{2, i}, 1)
                     error(errmsg, namepairs{1, i}, size(namepairs{2, i}, 1), nAns);
@@ -118,24 +123,37 @@ classdef Exports < handle
             end
             
             % Create directory
-            f = datestr(now);
-            f(f == ':') = ';';
-            f(f == '-') = ' ';
             fParent = 'Learning Data';
             if ~exist(strcat(pwd, '\', fParent), 'dir')
                 mkdir(fParent)
             end
-            mkdir(fParent, f);
-            filepath = strcat(pwd, '\', fParent, '\', f, '\');
+            
+            % Get current date/time
+            f = datestr(now);
+            f(f == ':') = ';';
+            f(f == '-') = ' ';
+            
+            % Ask where to save data
+            saveToPrev = questdlg('Add learning data to previous dataset?',...
+                'Save Learning Data',...
+                'Yes', 'No', 'Yes');
+            if strcmp(saveToPrev, 'Yes')
+                filepath = strcat(uigetdir(fParent, 'Add to Learning Data'));
+            else
+                mkdir(fParent, f);
+                filepath = strcat(pwd, '\', fParent, '\', f);
+            end
             
             % Write magnitude specturm contingent files
             for filename = namepairs;
-                fileID = fopen(strcat(filepath, filename{1}, '.csv'), 'wt');
-                fprintf(fileID, '%s %s\n', f, filename{1});
+                fileID = fopen(strcat(filepath, '\', filename{1}, '.csv'), 'at');
+                if ~strcmp(saveToPrev, 'Yes')
+                    fprintf(fileID, '%s %s\n', f, filename{1});
+                end
                 for i = 1:size(filename{2}, 1)
-                    fprintf(fileID, '%d,', filename{2}(i, 1:end-1)); % All values are numbers
+                    fprintf(fileID, '%.2f,', filename{2}(i, 1:end-1));  % All values are numbers
                     try
-                        fprintf(fileID, '%d\n', filename{2}(i, end));    % Last value goes to next line
+                        fprintf(fileID, '%.2f\n', filename{2}(i, end)); % Last value goes to next line
                     catch
                         if isempty(freqCoords)
                             warning('No frequencies selected, ''Frequency Coords.csv'' will be empty')
@@ -146,17 +164,11 @@ classdef Exports < handle
                 fclose(fileID);
             end
             
-            % Write frequency coordinates file
-            fileID = fopen(strcat(filepath, 'Frequency Coords.csv'), 'wt');
-            fprintf(fileID, '%s %s\n', f, 'Frequency Coords');
-            for i = 1:length(freqCoords)
-                fprintf(fileID, '%d\n', freqCoords(i));
-            end
-            fclose(fileID);
-            
             % Write answers file
-            fileID = fopen(strcat(filepath, 'Answers.csv'), 'wt');
-            fprintf(fileID, '%s %s\n', f, 'Answers');
+            fileID = fopen(strcat(filepath, '\Answers.csv'), 'at');
+            if ~strcmp(saveToPrev, 'Yes')
+                fprintf(fileID, '%s %s\n', f, 'Answers');
+            end
             for i = 1:numel(answers)
                 fprintf(fileID, '%s\n', answers{i});
             end
@@ -210,45 +222,4 @@ classdef Exports < handle
             save config.mat configData
         end
     end
-end
-
-function freqCoords = findFreqCoords(fourier, answers)
-    % Finds the frequency coordinats at which the cell types are most different
-    % 
-    %   fourier   reshaped magnitude spectrum of many cells
-    %   answers   corresponding cell types
-
-    % Match answers to data
-    a = find(strcmp(answers, 'apoptotic'));
-    n = find(strcmp(answers, 'necrotic'));
-    h = find(strcmp(answers, 'healthy'));
-    i = find(strcmp(answers, 'ignored'));
-    
-    % average all from each set
-    apopData = mean(fourier(a, :));
-    necrData = mean(fourier(n, :));
-    healData = mean(fourier(h, :));
-    ignrData = mean(fourier(i, :));
-    
-    % Compare data sets
-    an = apopData ./ necrData;
-    ah = apopData ./ healData;
-    ai = apopData ./ ignrData;
-    na = necrData ./ apopData;
-    nh = necrData ./ healData;
-    ni = necrData ./ ignrData;
-    ha = healData ./ apopData;
-    hn = healData ./ necrData;
-    hi = healData ./ ignrData;
-    ia = ignrData ./ apopData;
-    in = ignrData ./ necrData;
-    ih = ignrData ./ healData;
-    
-    % Select points >= 85% of highest RQ differences
-    vars = {an, ah, ai, na nh, ni, ha, hn, hi, ia, in, ih};
-    combined = zeros(1, 0);
-    for var = vars
-        combined = [combined, var{:}(var{:} > 0.85*max(var{:}))]; %#ok<AGROW>
-    end
-    freqCoords = unique(combined);
 end

@@ -89,7 +89,7 @@ classdef HaloImage < handle
             % Assign fields
             self.image = image;
             self.criteria = .500;       % default value
-            self.minSize = 300;         % default value
+            self.minSize = 1000;        % default value
             self.processed = false;
             self.reset = false;
             
@@ -614,8 +614,13 @@ classdef HaloImage < handle
             
             % Check inputs
             narginchk(3, 6);
-            [classifier, dataType, freqCoords] = checkClassifyInputs(varargin{:});
-            %   Note that freqCoords is returned empty if not using 'magspec' dataType
+            [classifier, dataType] = checkClassifyInputs(varargin{:});
+            
+            % Aquire frequency coordinates if using full magnitude spectrum. 
+            if strcmp(dataType, 'magspec')
+                findFreqCoords();
+                data = data(freqCoords);
+            end
             
             % Find indexes of each cell type in data
             a = strcmp(answers, 'apoptotic');
@@ -629,13 +634,13 @@ classdef HaloImage < handle
                 case 'knn'
                     % Classifies cells based on known data that is most similar by distance.
                     
-                    % Build classifier
+                    % Build classifier -- Appears to throw an error when run as a console app...?
                     knn = ClassificationKNN.fit(data, answers, 'DistanceWeight', 'squaredinverse');
                     
                     % Classify each cell
                     for j = 1:length(self.aCells)
                         [fourier, allbins, innerbins] = self.aCells{j}.fft();
-                        cellData = makeCellData(dataType, freqCoords);
+                        cellData = makeCellData(dataType);
                         prediction = knn.predict(cellData);
                         self.aCells{j}.setType(prediction{:});
                         predictions(j) = prediction;
@@ -644,23 +649,49 @@ classdef HaloImage < handle
                     % Makes a classifier using supervised K-means clustering. Cells are classified
                     % based on which Voronoi fragment they belong to. 
                     
-                    % Find centroids of each cluster
-                    [~, cn_a] = kmeans(data(a, :), 3, 'replicates', 3);
-                    [~, cn_n] = kmeans(data(n, :), 3, 'replicates', 3);
-                    [~, cn_h] = kmeans(data(h, :), 3, 'replicates', 3);
-                    [~, cn_i] = kmeans(data(i, :), 3, 'replicated', 3);
-                    
-                    % Create lookup array for quick prediction reference
+                    % Find centroids of each cluster and create lookup array for quick reference
+                    errmsg = 'Learning dataset contains too few %s datapoints for K-means classifier';
+                    index = 1;
                     lookup = cell(1, 12);
-                    lookup(1:3) = {'apoptotic'};    lookup(4:6) = {'necrotic'}; 
-                    lookup(7:9) = {'healthy'};      lookup(10:end) = {'ignored'};
-                    
+                    cn_all = zeros(size(data, 2), 0);
+                    try
+                        [~, cn_a] = kmeans(data(a, :), 3, 'replicates', 3);
+                        lookup(index : index + 2) = {'apoptotic'};
+                        index = index + 3;
+                        cn_all = [cn_all, cn_a'];
+                    catch
+                        warning(errmsg, 'apoptotic');
+                    end
+                    try
+                        [~, cn_n] = kmeans(data(n, :), 3, 'replicates', 3);
+                        lookup(index : index + 2) = {'necrotic'};
+                        index = index + 3;
+                        cn_all = [cn_all, cn_n'];
+                    catch
+                        warning(errmsg, 'necrotic');
+                    end
+                    try
+                        [~, cn_h] = kmeans(data(h, :), 3, 'replicates', 3);
+                        lookup(index : index + 2) = {'healthy'};
+                        index = index + 3;
+                        cn_all = [cn_all, cn_h'];
+                    catch
+                        warning(errmsg, 'healthy');
+                    end
+                    try
+                        [~, cn_i] = kmeans(data(i, :), 3, 'replicates', 3);
+                        lookup(index : index + 2) = {'ignored'};
+                        cn_all = [cn_all, cn_i'];
+                    catch
+                        warning(errmsg, 'ignored');
+                    end
+                                        
                     % Classify each cell
                     for j = 1:numel(self.aCells)
                         [fourier, allbins, innerbins] = self.aCells{j}.fft();
-                        cellData = makeCellData(dataType, freqCoords);
-                        dists = dist([cellData, cn_a', cn_n', cn_h', cn_i']);
-                        dists = dists(2:end, 1:end - 1); % TODO fix
+                        cellData = makeCellData(dataType);
+                        dists = dist([cellData', cn_all]);
+                        dists = dists(2:end, 1);
                         [~, idx] = min(dists);
                         prediction = lookup{idx};
                         self.aCells{j}.setType(prediction);
@@ -675,7 +706,7 @@ classdef HaloImage < handle
                     % Classify each cell
                     for j = 1:numel(self.aCells)
                         [fourier, allbins, innerbins] = self.aCells{j}.fft();
-                        cellData = makeCellData(dataType, freqCoords);
+                        cellData = makeCellData(dataType);
                         prediction = tree.predict(cellData);
                         self.aCells{j}.setType(prediction{:});
                         predictions(j) = prediction;                    
@@ -687,14 +718,14 @@ classdef HaloImage < handle
                 self.cellTypes.(type{:}) = sum(strcmp(predictions, type{:}));
             end
             
-            
-            % Checks the inputs for this function
-            function [classifier, dataType, freqCoords] = checkClassifyInputs(varargin)
+        %% checkClassifyInputs(<string>)
+            function [classifier, dataType] = checkClassifyInputs(varargin)
+                % Checks the inputs for the main function
                 
                 % Validate data and answers
                 validateattributes(data, {'numeric'}, {'positive'}, mfilename, 'allMags', 1);
                 validateattributes(answers, {'cell'}, {}, mfilename, 'answers', 2);
-                [nObs, nDeg] = size(data);
+                nObs = size(data, 1);
                 if nObs ~= numel(answers)
                     error(['Mismatched number of observations in data and answers',...
                         'Data: %d\nAnswers: %d\n'], nObs, numel(answers));
@@ -706,43 +737,24 @@ classdef HaloImage < handle
                     dataType = 'innerbins';     % Default is to use inner bins
                 else
                     for k = 1:numel(varargin)
-                        if ischar(varargin{k})
-                            arg = lower(varargin{k});
-                            if any(strcmp(arg, {'knn', 'kmeans', 'ctree'}));
-                                % Classifier option
-                                classifier = arg;
-                            elseif any(strcmp(arg, {'magspec', 'allbins', 'innerbins'}))
-                                % Data type option
-                                dataType = arg;
-                            else
-                                % Incorrect option
-                                error('Argument %d did not match any of the following strings: \n%s',...
-                                    k + 3, 'knn, kmeans, ctree, magspec, allbins, innerbins');
-                            end
+                        arg = lower(varargin{k});
+                        validatestring(arg, {'knn', 'kmeans', 'ctree', 'magspec', 'allbins',...
+                            'innerbins'}, mfilename, 'varargin', k + 2);
+                        if any(strcmp(arg, {'knn', 'kmeans', 'ctree'}));
+                            % Classifier option
+                            classifier = arg;
                         else
-                            % The only non-string inputs should be frequency coordinates, which must
-                            % be passed if the user selects the 'magspec' data type option
-                            freqCoords = uint64(varargin{k});
-                            validateattributes(freqCoords, {'numeric'}, {'ncols', 2, 'nrows', nDeg},...
-                                mfilename, 'freqCoords', k);
+                            % Data type option
+                            dataType = arg;
                         end
                     end
                 end
-                
-                % Check if frequency coordinates were passed if user is using 'magspec' data type
-                if strcmp(dataType, 'magspec')
-                    if ~exist('freqCoords', 'var')
-                        error(['If using ''magspec'' data type, you must pass freqency coordinates ',...
-                            'to the function']);
-                    end
-                else
-                    freqCoords = [];
-                end
             end
             
-            
-            % Makes the cell data for classification purposes
-            function cellData = makeCellData(dataType, freqCoords)
+        %% makeCellData(string, double)
+            function cellData = makeCellData(dataType)
+                % Makes the cell data for classification purposes
+                
                 switch dataType
                     case 'magspec'
                         % Find which frequencies to use
@@ -756,6 +768,40 @@ classdef HaloImage < handle
                     case 'innerbins'
                         cellData = reshape(innerbins, 1, []);
                 end
+            end
+            
+        %% findFreqCords()
+            function findFreqCoords()
+                % Finds the frequency coordinats at which the cell types are most different
+
+                % average all from each set
+                apopData = mean(fourier(a, :));
+                necrData = mean(fourier(n, :));
+                healData = mean(fourier(h, :));
+                ignrData = mean(fourier(i, :));
+
+                % Compare data sets
+                an = apopData ./ necrData;
+                ah = apopData ./ healData;
+                ai = apopData ./ ignrData;
+                na = necrData ./ apopData;
+                nh = necrData ./ healData;
+                ni = necrData ./ ignrData;
+                ha = healData ./ apopData;
+                hn = healData ./ necrData;
+                hi = healData ./ ignrData;
+                ia = ignrData ./ apopData;
+                in = ignrData ./ necrData;
+                ih = ignrData ./ healData;
+
+                % Select points >= threshold% of highest RQ differences
+                vars = {an, ah, ai, na nh, ni, ha, hn, hi, ia, in, ih};
+                combined = zeros(1, 0);
+                threshold = 0.85;
+                for var = vars
+                    combined = [combined, var{:}(var{:} > threshold * max(var{:}))]; %#ok<AGROW>
+                end
+                freqCoords = unique(combined);
             end
         end
         

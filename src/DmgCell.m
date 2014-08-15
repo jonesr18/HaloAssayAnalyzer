@@ -74,7 +74,7 @@ classdef DmgCell < handle
             validateattributes(image, {'uint8'}, {}, mfilename, 'image', 1);
             
             % Extract basic image info
-            numThresh = 2;
+            numThresh = 3;
             self.image = image;
             self.thresh = imquantize(self.image, multithresh(self.image, numThresh));
             self.binary = (self.thresh > 1);
@@ -219,7 +219,7 @@ classdef DmgCell < handle
             %           'halo'      - Plots the halo region as a binary image
             %           'nucleus'   - Plots the nucleus region as a binary image
             %           'centroid'  - Plots the centroid with lines extending to the projected edges
-            %                         of the halo and the nucleu
+            %                         of the halo and the nucleus
             %           'damage'    - Plots the DNA damage metrics overlaid on the grayscale image
             %           'all'       - Plots all options
             
@@ -250,9 +250,9 @@ classdef DmgCell < handle
                     case 'centroid'
                         figure(), imshow(self.image, []), hold on
                         c = self.centroid;
-                        plot(c(1), c(2), 'ro')
-                        plot([c(1), c(1)], [c(2), c(2) + self.radius], 'b')
-                        plot([c(1), c(1) + self.nucRadius], [c(2), c(2)], 'y')
+                        plot(c(2), c(1), 'ko')
+                        plot([c(2), c(2)], [c(1), c(1) + self.radius], 'b')
+                        plot([c(2), c(2) + self.nucRadius], [c(1), c(1)], 'r')
                         title('Centroid and halo/nuclear radii'), hold off
                     case 'damage'
                         figure(), imshow(self.image, []), hold on
